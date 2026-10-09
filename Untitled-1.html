@@ -1,0 +1,606 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Studio | 無料PDFツール</title>
+
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.10.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.6/purify.min.js"></script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f3f6fb;
+  color: #1e293b;
+  font-family: Arial, "Meiryo", sans-serif;
+}
+
+header {
+  background: linear-gradient(120deg,#2563eb,#4338ca);
+  color: white;
+  text-align: center;
+  padding: 45px 20px;
+}
+
+header h1 { font-size: 36px; margin: 0; }
+header p { color: #dbeafe; }
+
+main {
+  max-width: 1050px;
+  margin: 35px auto;
+  padding: 0 18px;
+}
+
+.intro { text-align: center; margin-bottom: 28px; }
+
+.tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.tool {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 22px 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+  color: #334155;
+}
+
+.tool:hover { border-color: #93c5fd; }
+
+.tool.active {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.panel {
+  display: none;
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 8px 25px #0000000b;
+}
+
+.panel.active { display: block; }
+
+.drop {
+  margin: 24px 0;
+  padding: 45px 15px;
+  border: 2px dashed #93c5fd;
+  background: #f8fbff;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.drop:hover, .drop.dragover {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.drop .emoji { font-size: 36px; }
+.drop p { color: #64748b; }
+
+.file-list {
+  white-space: pre-line;
+  color: #475569;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+button.action {
+  width: 100%;
+  background: #2563eb;
+  border: none;
+  border-radius: 9px;
+  padding: 15px;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 18px;
+}
+
+button.action:hover { background: #1d4ed8; }
+button.action:disabled { opacity: .5; cursor: wait; }
+
+input[type=number], textarea, select {
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 16px;
+}
+
+input[type=number] { width: 100px; }
+
+textarea {
+  width: 100%;
+  height: 220px;
+  resize: vertical;
+}
+
+label { display: inline-block; margin: 10px 0; }
+
+.status {
+  margin-top: 15px;
+  color: #475569;
+  min-height: 24px;
+}
+
+.status.error { color: #dc2626; }
+.status.success { color: #15803d; }
+
+.note {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 13px;
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 18px;
+}
+
+footer {
+  text-align: center;
+  padding: 30px;
+  color: #64748b;
+}
+
+/* PDF生成用の文章 */
+#renderArea {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 794px;
+  background: white;
+  color: black;
+  padding: 25px;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+#renderArea img { max-width: 100%; }
+#renderArea table { border-collapse: collapse; }
+#renderArea td, #renderArea th {
+  border: 1px solid #aaa;
+  padding: 5px;
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>PDF Studio</h1>
+  <p>PDFの作成・変換・結合・分割がすべて無料</p>
+</header>
+
+<main>
+<div class="intro">
+  <h2>使いたいPDFツールを選択</h2>
+  <p>ファイルを選ぶだけで簡単にPDFを処理できます。</p>
+</div>
+
+<nav class="tools">
+  <button class="tool active" data-tab="word">📄 Word → PDF</button>
+  <button class="tool" data-tab="merge">🔗 PDF結合</button>
+  <button class="tool" data-tab="split">✂️ PDF分割</button>
+  <button class="tool" data-tab="image">🖼️ 画像 → PDF</button>
+  <button class="tool" data-tab="text">✏️ 文章 → PDF</button>
+</nav>
+
+<section id="word" class="panel active">
+  <h2>WordをPDFに変換</h2>
+  <p>Wordファイル（.docx）をPDFに変換します。</p>
+
+  <div class="drop" data-input="wordFile">
+    <div class="emoji">📄</div>
+    <h3>Wordファイルをドロップ</h3>
+    <p>クリックして選択することもできます</p>
+    <input id="wordFile" type="file" accept=".docx" hidden>
+  </div>
+
+  <div id="wordList" class="file-list"></div>
+  <button class="action" onclick="convertWord()">PDFに変換</button>
+  <div id="wordStatus" class="status"></div>
+  <div class="note">※ .docx専用です。複雑な表やレイアウト、ヘッダーなどは元のWordと異なる場合があります。</div>
+</section>
+
+<section id="merge" class="panel">
+  <h2>複数のPDFを結合</h2>
+  <p>選択した順番でPDFを1つにまとめます。</p>
+
+  <div class="drop" data-input="mergeFiles">
+    <div class="emoji">🔗</div>
+    <h3>複数のPDFをドロップ</h3>
+    <p>まとめてファイルを選択できます</p>
+    <input id="mergeFiles" type="file" accept=".pdf" multiple hidden>
+  </div>
+
+  <div id="mergeList" class="file-list"></div>
+  <button class="action" onclick="mergePDF()">PDFを結合する</button>
+  <div id="mergeStatus" class="status"></div>
+</section>
+
+<section id="split" class="panel">
+  <h2>PDFをページごとに分割</h2>
+  <p>指定した範囲の各ページを別々のPDFにします。</p>
+
+  <div class="drop" data-input="splitFile">
+    <div class="emoji">✂️</div>
+    <h3>PDFファイルをドロップ</h3>
+    <input id="splitFile" type="file" accept=".pdf" hidden>
+  </div>
+
+  <div id="splitList" class="file-list"></div>
+
+  <label>開始ページ
+    <input type="number" id="startPage" min="1" value="1">
+  </label>
+
+  <label>終了ページ
+    <input type="number" id="endPage" min="1" value="1">
+  </label>
+
+  <button class="action" onclick="splitPDF()">分割してZIPで保存</button>
+  <div id="splitStatus" class="status"></div>
+</section>
+
+<section id="image" class="panel">
+  <h2>画像をPDFに変換</h2>
+  <p>1枚または複数の画像をPDFにまとめます。</p>
+
+  <div class="drop" data-input="imageFiles">
+    <div class="emoji">🖼️</div>
+    <h3>画像をドロップ</h3>
+    <p>JPG・PNGに対応</p>
+    <input id="imageFiles" type="file"
+      accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+      multiple hidden>
+  </div>
+
+  <div id="imageList" class="file-list"></div>
+  <button class="action" onclick="imagesToPDF()">画像をPDFに変換</button>
+  <div id="imageStatus" class="status"></div>
+</section>
+
+<section id="text" class="panel">
+  <h2>文章からPDFを作成</h2>
+  <p>文章を入力するとPDFを作成できます。</p>
+
+  <textarea id="textInput" placeholder="文章を入力してください"></textarea>
+
+  <p>
+    <label>文字サイズ
+      <select id="fontSize">
+        <option value="12">12px</option>
+        <option value="16" selected>16px</option>
+        <option value="20">20px</option>
+        <option value="24">24px</option>
+        <option value="32">32px</option>
+      </select>
+    </label>
+  </p>
+
+  <button class="action" onclick="textToPDF()">PDFを作成</button>
+  <div id="textStatus" class="status"></div>
+</section>
+</main>
+
+<div id="renderArea"></div>
+
+<footer>
+  <p>PDF Studio - Free Online PDF Tools</p>
+  <p>ファイルはブラウザ内で処理されます</p>
+</footer>
+
+<script>
+const { PDFDocument } = PDFLib;
+
+// 選択したファイルを保持
+const selected = {};
+
+// ツール切り替え
+document.querySelectorAll(".tool").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".tool,.panel")
+      .forEach(el => el.classList.remove("active"));
+
+    button.classList.add("active");
+    document.getElementById(button.dataset.tab)
+      .classList.add("active");
+  });
+});
+
+// ドラッグ＆ドロップ
+document.querySelectorAll(".drop").forEach(drop => {
+  const input = document.getElementById(drop.dataset.input);
+
+  drop.addEventListener("click", () => input.click());
+
+  drop.addEventListener("dragover", e => {
+    e.preventDefault();
+    drop.classList.add("dragover");
+  });
+
+  drop.addEventListener("dragleave", () => {
+    drop.classList.remove("dragover");
+  });
+
+  drop.addEventListener("drop", e => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+    setFiles(input.id, e.dataTransfer.files);
+  });
+
+  input.addEventListener("change", () => {
+    setFiles(input.id, input.files);
+  });
+});
+
+function setFiles(id, files) {
+  const accepted = {
+    wordFile: /\.(docx)$/i,
+    mergeFiles: /\.(pdf)$/i,
+    splitFile: /\.(pdf)$/i,
+    imageFiles: /\.(jpg|jpeg|png)$/i
+  };
+
+  const list = Array.from(files).filter(file =>
+    accepted[id].test(file.name)
+  );
+
+  selected[id] = id === "wordFile" || id === "splitFile"
+    ? list.slice(0,1) : list;
+
+  const listId = {
+    wordFile: "wordList",
+    mergeFiles: "mergeList",
+    splitFile: "splitList",
+    imageFiles: "imageList"
+  }[id];
+
+  const chosen = selected[id];
+
+  document.getElementById(listId).textContent =
+    chosen.length
+      ? chosen.map((f,i) => `${i+1}. ${f.name}`).join("\n")
+      : "対応するファイルがありません";
+
+  if (id === "splitFile" && chosen.length) {
+    inspectPDF(chosen[0]);
+  }
+}
+
+function status(id, message, type = "") {
+  const el = document.getElementById(id);
+  el.textContent = message;
+  el.className = "status " + type;
+}
+
+function download(bytes, name, mime = "application/pdf") {
+  const blob = new Blob([bytes], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function safeName(name) {
+  return name.replace(/\.[^.]+$/, "");
+}
+
+// Word → PDF
+async function convertWord() {
+  const file = selected.wordFile?.[0];
+  if (!file) return status("wordStatus","Wordファイルを選択してください","error");
+
+  status("wordStatus","変換中...");
+  const area = document.getElementById("renderArea");
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const result = await mammoth.convertToHtml({
+      arrayBuffer: buffer,
+      convertImage: mammoth.images.imgElement(async image => ({
+        src: "data:" + image.contentType + ";base64," +
+          await image.read("base64")
+      }))
+    });
+
+    area.innerHTML = DOMPurify.sanitize(result.value, {
+      ADD_URI_SAFE_ATTR: ["src"]
+    });
+
+    await makeHTMLPDF(area, safeName(file.name)+".pdf");
+    status("wordStatus","PDFを作成しました","success");
+  } catch(err) {
+    console.error(err);
+    status("wordStatus","変換に失敗しました。対応するdocxファイルか確認してください","error");
+  } finally {
+    area.replaceChildren();
+  }
+}
+
+// 複数PDF結合
+async function mergePDF() {
+  const files = selected.mergeFiles || [];
+
+  if (files.length < 2)
+    return status("mergeStatus","PDFを2つ以上選択してください","error");
+
+  status("mergeStatus","結合中...");
+
+  try {
+    const output = await PDFDocument.create();
+
+    for (const file of files) {
+      const source = await PDFDocument.load(await file.arrayBuffer());
+      const pages = await output.copyPages(source, source.getPageIndices());
+      pages.forEach(page => output.addPage(page));
+    }
+
+    download(await output.save(), "merged.pdf");
+    status("mergeStatus","結合が完了しました","success");
+  } catch(err) {
+    console.error(err);
+    status("mergeStatus","結合に失敗しました。パスワード付きPDFなどは使えません","error");
+  }
+}
+
+// PDFのページ数を確認
+async function inspectPDF(file) {
+  try {
+    const doc = await PDFDocument.load(await file.arrayBuffer());
+    const count = doc.getPageCount();
+
+    document.getElementById("startPage").value = 1;
+    document.getElementById("endPage").value = count;
+    document.getElementById("startPage").max = count;
+    document.getElementById("endPage").max = count;
+
+    status("splitStatus",`全${count}ページです`);
+  } catch(err) {
+    status("splitStatus","PDFを読み込めませんでした","error");
+  }
+}
+
+// PDF分割 → ZIP
+async function splitPDF() {
+  const file = selected.splitFile?.[0];
+  if (!file)
+    return status("splitStatus","PDFを選択してください","error");
+
+  status("splitStatus","分割中...");
+
+  try {
+    const source = await PDFDocument.load(await file.arrayBuffer());
+    const count = source.getPageCount();
+    const start = Number(document.getElementById("startPage").value);
+    const end = Number(document.getElementById("endPage").value);
+
+    if (!Number.isInteger(start) || !Number.isInteger(end) ||
+        start < 1 || end > count || start > end) {
+      return status("splitStatus","ページ範囲が正しくありません","error");
+    }
+
+    const zip = new JSZip();
+
+    for (let i = start; i <= end; i++) {
+      const doc = await PDFDocument.create();
+      const [page] = await doc.copyPages(source,[i-1]);
+      doc.addPage(page);
+      const bytes = await doc.save();
+
+      zip.file(`page_${i}.pdf`, bytes);
+    }
+
+    const blob = await zip.generateAsync({type:"blob"});
+    download(blob, "split_pages.zip", "application/zip");
+
+    status("splitStatus",`${end-start+1}ページを分割しました`,"success");
+  } catch(err) {
+    console.error(err);
+    status("splitStatus","分割に失敗しました","error");
+  }
+}
+
+// 画像 → PDF
+async function imagesToPDF() {
+  const files = selected.imageFiles || [];
+  if (!files.length)
+    return status("imageStatus","画像を選択してください","error");
+
+  status("imageStatus","PDF作成中...");
+
+  try {
+    const doc = await PDFDocument.create();
+
+    for (const file of files) {
+      const bytes = await file.arrayBuffer();
+
+      const image = /\.png$/i.test(file.name)
+        ? await doc.embedPng(bytes)
+        : await doc.embedJpg(bytes);
+
+      const page = doc.addPage([595.28, 841.89]);
+      const margin = 30;
+
+      const scale = Math.min(
+        (595.28 - 2*margin) / image.width,
+        (841.89 - 2*margin) / image.height
+      );
+
+      const width = image.width * scale;
+      const height = image.height * scale;
+
+      page.drawImage(image, {
+        x: (595.28-width)/2,
+        y: (841.89-height)/2,
+        width,
+        height
+      });
+    }
+
+    download(await doc.save(), "images.pdf");
+    status("imageStatus","PDFを作成しました","success");
+  } catch(err) {
+    console.error(err);
+    status("imageStatus","画像の変換に失敗しました","error");
+  }
+}
+
+// HTMLからPDF生成
+async function makeHTMLPDF(element, filename) {
+  await html2pdf().set({
+    margin: 10,
+    filename,
+    image: {type:"jpeg",quality:0.98},
+    html2canvas: {scale:2},
+    jsPDF: {unit:"mm",format:"a4",orientation:"portrait"},
+    pagebreak: {mode:["css","legacy"]}
+  }).from(element).save();
+}
+
+// 文章 → PDF
+async function textToPDF() {
+  const value = document.getElementById("textInput").value;
+  if (!value.trim())
+    return status("textStatus","文章を入力してください","error");
+
+  const area = document.getElementById("renderArea");
+  area.textContent = value;
+  area.style.whiteSpace = "pre-wrap";
+  area.style.fontSize = document.getElementById("fontSize").value+"px";
+
+  status("textStatus","作成中...");
+
+  try {
+    await makeHTMLPDF(area,"document.pdf");
+    status("textStatus","PDFを作成しました","success");
+  } catch(err) {
+    console.error(err);
+    status("textStatus","PDFの作成に失敗しました","error");
+  } finally {
+    area.replaceChildren();
+  }
+}
+</script>
+</body>
+</html>
